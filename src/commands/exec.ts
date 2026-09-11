@@ -3,7 +3,7 @@ import { WarplineError } from '../core/errors.js';
 import { glyph, out, theme } from '../core/ui.js';
 import { tildify } from '../core/paths.js';
 import { parseEnvOverrides, resolveEnv } from '../env/resolve.js';
-import { runToCompletion } from '../proc/spawn.js';
+import { buildShellCommand, runToCompletion } from '../proc/spawn.js';
 import { resolveProject } from './context.js';
 
 export const execFlags: FlagSpecs = {
@@ -27,13 +27,29 @@ export function execHelp(): string {
     `  ${theme.code('warpline exec -- npx prisma migrate dev')}`,
     `  ${theme.code('warpline exec myapp -- npm run seed')}`,
     `  ${theme.code('warpline exec --in api -- npm test')}`,
+    '',
+    'Arguments after `--` keep their boundaries, so a value containing spaces stays',
+    'one argument. To use shell operators, pass the whole command as one argument:',
+    '',
+    `  ${theme.code('warpline exec -- "npm run build && npm run start"')}`,
   ].join('\n');
 }
 
 export async function runExec(argv: string[]): Promise<number> {
   const parsed = parseArgs(argv, execFlags);
 
-  const command = parsed.passthrough.join(' ').trim();
+  // The shell that invoked warpline has already stripped quotes, so these arrive
+  // as separate argv entries. Joining them raw loses the boundaries -- and with
+  // them any argument containing a space:
+  // `warpline exec -- npm run "my script"` became `npm run my script`.
+  //
+  // A single entry is passed through untouched, so wrapping a whole command in
+  // quotes remains the way to use shell operators on purpose:
+  // `warpline exec -- "npm run a && npm run b"`.
+  const passthrough = parsed.passthrough;
+  const command =
+    passthrough.length === 1 ? (passthrough[0] ?? '').trim() : buildShellCommand(passthrough);
+
   if (command.length === 0) {
     throw new WarplineError('No command given', {
       hint: 'Put the command after `--`, for example: warpline exec -- npm run seed',

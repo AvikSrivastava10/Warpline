@@ -56,6 +56,32 @@ export function spawnShellCommand(options: SpawnCommandOptions): SpawnedProcess 
   };
 }
 
+/**
+ * Quotes one argument so a shell reproduces it verbatim.
+ *
+ * Needed because commands are handed to `spawn` with `shell: true`, which means
+ * anything assembled from separate argv entries has to survive a round trip
+ * through the platform shell's own parsing.
+ */
+export function quoteForShell(token: string): string {
+  if (isWindows) {
+    // cmd treats & | < > ^ ( ) literally inside double quotes, so quoting covers
+    // the metacharacters. An embedded double quote is the awkward case, and
+    // doubling it is the form cmd itself understands.
+    if (token.length > 0 && !/[\s"^&|<>()!%,;=]/.test(token)) return token;
+    return `"${token.replace(/"/g, '""')}"`;
+  }
+  if (token.length > 0 && /^[A-Za-z0-9_@%+=:,./-]+$/.test(token)) return token;
+  // Single quotes suppress every form of expansion in sh. A literal single quote
+  // cannot appear inside them, so it has to leave and re-enter the quoted run.
+  return `'${token.replace(/'/g, `'\\''`)}'`;
+}
+
+/** Joins an argv array into a shell command string without losing boundaries. */
+export function buildShellCommand(argv: string[]): string {
+  return argv.map(quoteForShell).join(' ');
+}
+
 function execQuiet(command: string, args: string[], timeoutMs = 5000): Promise<void> {
   return new Promise((resolve) => {
     try {

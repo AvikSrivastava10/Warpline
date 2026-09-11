@@ -263,6 +263,16 @@ async function probeHttp(probe: ReadyProbe): Promise<boolean> {
       // deliberately generous; tighten it with `ready.status`.
       headers: { 'user-agent': 'warpline-readiness' },
     });
+
+    // The body is never wanted, only the status. Undici holds the connection open
+    // until the body is read or cancelled, and this runs on a poll loop, so
+    // leaving it dangling leaks a socket per attempt for the whole probe budget.
+    try {
+      await response.body?.cancel();
+    } catch {
+      /* already closed or errored; nothing to release */
+    }
+
     return response.status <= maxStatus;
   } catch {
     return false;

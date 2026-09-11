@@ -165,6 +165,17 @@ function parseEnv(raw: unknown, problems: Problems): EnvConfig {
     return { ...empty, vars: asVarMap(raw, 'env', problems) };
   }
 
+  // Mixing the two forms silently dropped values: `env: { files: [...], NODE_ENV: x }`
+  // took the long-form branch and NODE_ENV vanished with no diagnostic at all.
+  // Anything unrecognised here is a mistake worth naming.
+  for (const key of keys) {
+    if (!RESERVED_ENV_KEYS.has(key)) {
+      problems.add(
+        `unknown key "env.${key}" - env takes files/requireFiles/vars/passthrough/require/isolate; to set a variable, put it under env.vars`,
+      );
+    }
+  }
+
   const requireFilesRaw = raw.requireFiles ?? raw.require_files;
   const files = asStringList(raw.files, 'env.files', problems);
   const requireFiles = asStringList(requireFilesRaw, 'env.requireFiles', problems);

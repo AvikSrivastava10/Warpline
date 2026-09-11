@@ -228,20 +228,28 @@ export function readLogTail(file: string, lines: number): string[] {
     const size = fs.fstatSync(handle).size;
     const chunkSize = 64 * 1024;
     let position = size;
-    let buffer = '';
-    let found = 0;
+    const chunks: Buffer[] = [];
+    let newlines = 0;
 
-    while (position > 0 && found <= lines) {
+    // Chunks are kept as bytes and decoded once at the end. Decoding each chunk
+    // as it was read corrupted any character straddling a chunk boundary, since
+    // half a UTF-8 sequence decodes to a replacement character.
+    while (position > 0 && newlines <= lines) {
       const readSize = Math.min(chunkSize, position);
       position -= readSize;
       const chunk = Buffer.alloc(readSize);
       fs.readSync(handle, chunk, 0, readSize, position);
-      const text = chunk.toString('utf8');
-      buffer = text + buffer;
-      found = (buffer.match(/\n/g) ?? []).length;
+      chunks.unshift(chunk);
+
+      // Counting the byte rather than the decoded character is exact here: every
+      // continuation byte in UTF-8 is >= 0x80, so 0x0A can only ever be a real
+      // newline and never part of a multi-byte sequence.
+      for (const byte of chunk) {
+        if (byte === 0x0a) newlines += 1;
+      }
     }
 
-    const all = buffer.split(/\r?\n/);
+    const all = Buffer.concat(chunks).toString('utf8').split(/\r?\n/);
     if (all[all.length - 1] === '') all.pop();
     return all.slice(-lines);
   } catch {

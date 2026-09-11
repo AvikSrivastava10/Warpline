@@ -549,6 +549,23 @@ describe('normalizeConfig', () => {
       expect(problemsOf({ env: ['.env'], processes: { web: 'x' } })).toContain('env must be a mapping');
     });
 
+    it('rejects a variable placed alongside long-form keys instead of dropping it', () => {
+      // Mixing the forms used to silently discard the variable: the block took the
+      // long-form branch and NODE_ENV was never read.
+      const problems = problemsOf({
+        env: { files: ['.env'], NODE_ENV: 'development' },
+        processes: { web: 'x' },
+      }).join('\n');
+      expect(problems).toContain('unknown key "env.NODE_ENV"');
+      expect(problems).toContain('env.vars');
+    });
+
+    it('still accepts a pure shorthand block', () => {
+      expect(normalize({ env: { NODE_ENV: 'development' }, processes: { web: 'x' } }).env.vars).toEqual({
+        NODE_ENV: 'development',
+      });
+    });
+
     it('keeps per-process variables separate from project ones', () => {
       const proc = processFrom({ command: 'x', env: { API_URL: 'http://localhost:4000' } });
       expect(proc.env).toEqual({ API_URL: 'http://localhost:4000' });
