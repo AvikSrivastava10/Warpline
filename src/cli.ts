@@ -243,6 +243,22 @@ async function suggestCommands(input: string): Promise<string[]> {
   return suggestions;
 }
 
+/**
+ * True when the user is asking for a command's own help.
+ *
+ * Scanning stops at the first bare `--`, because everything after it belongs to a
+ * child process. Without that boundary `warpline exec -- npm --help` printed
+ * warpline's help instead of running npm's, which made it impossible to pass
+ * `--help` or `-h` through to anything.
+ */
+export function wantsHelp(rest: string[]): boolean {
+  for (const token of rest) {
+    if (token === '--') return false;
+    if (token === '--help' || token === '-h') return true;
+  }
+  return false;
+}
+
 export async function runCli(argv: string[]): Promise<number> {
   const [first, ...rest] = argv;
 
@@ -279,7 +295,7 @@ export async function runCli(argv: string[]): Promise<number> {
   const spec = COMMANDS[name] as CommandSpec;
   const { run, help } = await spec.load();
 
-  if (rest.includes('--help') || rest.includes('-h')) {
+  if (wantsHelp(rest)) {
     out.write(help());
     return 0;
   }

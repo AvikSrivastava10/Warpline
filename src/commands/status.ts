@@ -73,6 +73,11 @@ async function printProject(name: string, options: { probe: boolean; only: strin
     return false;
   }
 
+  // `--all` enumerates state files, whose names are slugs, so a project called
+  // "MyApp" arrives here as "myapp". Every other command prints the real name, so
+  // prefer the one recorded in the state file.
+  const displayName = info.state.name.length > 0 ? info.state.name : name;
+
   const wanted = new Set(options.only);
   const processes = Object.values(info.state.processes).filter(
     (proc) => wanted.size === 0 || wanted.has(proc.id),
@@ -80,8 +85,8 @@ async function printProject(name: string, options: { probe: boolean; only: strin
 
   const running = info.live.length > 0;
   const header = running
-    ? `${theme.ok(glyph.running)} ${theme.bold(theme.accent(name))}`
-    : `${theme.dim(glyph.stopped)} ${theme.bold(name)}`;
+    ? `${theme.ok(glyph.running)} ${theme.bold(theme.accent(displayName))}`
+    : `${theme.dim(glyph.stopped)} ${theme.bold(displayName)}`;
 
   const mode = info.state.mode === 'detached' ? theme.dim('detached') : theme.dim('foreground');
   const uptime = running ? theme.dim(`up ${formatDuration(Date.now() - info.state.startedAt)}`) : theme.dim('stopped');

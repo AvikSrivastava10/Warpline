@@ -13,7 +13,14 @@ import { checkPortConflicts, isPortListening } from '../proc/ports.js';
 import { terminateTree } from '../proc/spawn.js';
 import { ProcessLogger } from '../proc/logger.js';
 import { Supervisor } from '../proc/supervisor.js';
-import { inspectRuntime, reconcileRuntime, clearRuntime, isPidAlive, type ProcessRuntime } from '../state/runtime.js';
+import {
+  inspectRuntime,
+  reconcileRuntime,
+  clearRuntime,
+  isPidAlive,
+  type ProcessRuntime,
+  type ProjectRuntime,
+} from '../state/runtime.js';
 import { touchProject, upsertProject } from '../state/registry.js';
 import { resolveProject } from './context.js';
 import type { ProcessConfig, WarplineConfig } from '../config/types.js';
@@ -231,6 +238,11 @@ export async function runUp(argv: string[]): Promise<number> {
   if (existing && existing.live.length > 0) {
     if (flagBool(parsed, 'restart')) {
       out.step(`stopping ${theme.bold(name)} before restarting`);
+      // The supervisor goes first, deliberately. It owns the children, so if it
+      // outlives them it reads their exit as a crash and restarts them under its
+      // own ownership -- after which the replacement supervisor refuses to start
+      // and the restart silently accomplishes nothing.
+      await stopSupervisor(existing.state);
       await stopLiveProcesses(existing.live);
       clearRuntime(name);
     } else {
@@ -266,6 +278,18 @@ export async function runUp(argv: string[]): Promise<number> {
   }
 
   return startForeground(name, config, parsed, overrides, processes);
+}
+
+/**
+ * Stops a detached supervisor left over from an earlier run.
+ *
+ * Terminating the tree also takes its children with it: on POSIX the supervisor
+ * leads its own process group, and on Windows `taskkill /T` walks the tree.
+ */
+async function stopSupervisor(state: ProjectRuntime): Promise<void> {
+  const pid = state.supervisorPid;
+  if (pid === process.pid || !isPidAlive(pid)) return;
+  await terminateTree(pid, { graceMs: 5000 });
 }
 
 async function stopLiveProcesses(live: ProcessRuntime[]): Promise<void> {
@@ -443,7 +467,15 @@ async function startDetached(
     await sleep(250);
     const info = inspectRuntime(name);
 
-    if (info) {
+    // Only trust state written by the supervisor this call launched. Clearing the
+    // file up front is not enough on its own: a foreign supervisor that still owns
+    // the project rewrites it within milliseconds, and reading that would report
+    // its processes as though they were ours -- which is how `up --restart -d`
+    // came to announce success while the replacement supervisor had already
+    // refused to start.
+    const isOurs = info !== undefined && info.state.supervisorPid === child.pid;
+
+    if (info && isOurs) {
       const entries = Object.values(info.state.processes).filter((proc) => expected.has(proc.id));
       const settled = entries.filter((proc) => settledStatuses.has(proc.status));
 
@@ -472,9 +504,22 @@ async function startDetached(
       }
     }
 
-    // The supervisor dying without ever writing state means it failed during
-    // startup, before it could report anything useful.
-    if (!info && !isPidAlive(child.pid)) {
+    // Our supervisor is gone without having reported anything. Either it failed
+    // during startup, or it refused because another supervisor already owns this
+    // project. Both are explained in its log, and neither may be reported as
+    // success merely because a state file exists.
+    if (!isPidAlive(child.pid)) {
+      const foreignPid = info && !isOurs ? info.state.supervisorPid : undefined;
+
+      if (foreignPid !== undefined && isPidAlive(foreignPid)) {
+        throw new WarplineError(
+          `${name} is already being supervised by pid ${foreignPid}, so a second supervisor refused to start`,
+          {
+            hint: `Stop it with \`warpline down ${name}\`, or \`warpline down --orphans\` if warpline has lost track of it.`,
+          },
+        );
+      }
+
       throw new WarplineError('The background supervisor exited before reporting any state', {
         hint: `Check ${tildify(supervisorLog)} for details.`,
       });

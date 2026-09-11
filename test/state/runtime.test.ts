@@ -121,8 +121,34 @@ describe('reading and writing state', () => {
     const state = stateWith([]);
     state.name = 'My App/v2';
     writeRuntime(state);
+
     expect(fs.existsSync(paths.stateFile('My App/v2'))).toBe(true);
-    expect(listRuntimeNames()).toEqual(['my-app-v2']);
+
+    const [listed] = listRuntimeNames();
+    // A digest is appended whenever normalisation changed the name, so distinct
+    // names cannot collapse onto one state file.
+    expect(listed).toMatch(/^my-app-v2-[0-9a-f]{8}$/);
+
+    // Slugs are handed back in as names, so the slug must resolve to the same
+    // file and the real name must still be recoverable from it.
+    expect(readRuntime(listed as string)?.name).toBe('My App/v2');
+  });
+
+  it('keeps two names that differ only in case in separate state files', () => {
+    const upper = stateWith([]);
+    upper.name = 'MyApp';
+    writeRuntime(upper);
+
+    const lower = stateWith([]);
+    lower.name = 'myapp';
+    lower.root = `${home}/other`;
+    writeRuntime(lower);
+
+    // Sharing a file meant `status` reported the other project's processes and
+    // `down` stopped them.
+    expect(listRuntimeNames()).toHaveLength(2);
+    expect(readRuntime('MyApp')?.root).toBe(home);
+    expect(readRuntime('myapp')?.root).toBe(`${home}/other`);
   });
 });
 

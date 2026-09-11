@@ -1,6 +1,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 
 /**
  * All Warpline global state lives under a single root so it is trivially
@@ -41,13 +42,26 @@ export const paths = {
  * dash. Kept deliberately aggressive: correctness over prettiness.
  */
 export function safeSlug(input: string): string {
-  const slug = input
-    .trim()
+  const trimmed = input.trim();
+  if (trimmed.length === 0) return 'unnamed';
+
+  const normalized = trimmed
     .toLowerCase()
     .replace(/[^a-z0-9._-]+/g, '-')
     .replace(/^[-.]+|[-.]+$/g, '')
     .slice(0, 100);
-  return slug.length > 0 ? slug : 'unnamed';
+
+  // Already filename-safe, so the name can be used as it stands. This is also
+  // what makes the function idempotent: slugging a slug returns it unchanged,
+  // which matters because `listRuntimeNames` hands slugs back in as names.
+  if (normalized === trimmed) return normalized;
+
+  // Normalisation is lossy. `MyApp`, `myapp`, and `my app` all reduce to the same
+  // string, which would silently point three different projects at one state file
+  // and one log directory -- so `status` would report another project's processes
+  // and `down` would stop them. A short digest of the original keeps them apart.
+  const digest = crypto.createHash('sha256').update(trimmed).digest('hex').slice(0, 8);
+  return `${normalized.length > 0 ? normalized : 'unnamed'}-${digest}`;
 }
 
 export function ensureDir(dir: string): string {
