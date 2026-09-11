@@ -172,7 +172,7 @@ All probes accept `timeout` (default 90000) and `interval` (default 250).
 | `env` | `{}` | Extra variables for this process only |
 | `restart` | `on-failure` (`no` for tasks) | Also `always` or `no` |
 | `maxRestarts` | `3` | Exponential backoff from `backoff` (default 500ms), capped at 30s |
-| `open` | — | `true` uses the declared port, or give an explicit URL |
+| `open` | — | `true` uses the declared port, or give an explicit `http(s)` URL. Other schemes are rejected |
 | `optional` | `false` | Excluded from a bare `warpline up` |
 | `stopTimeout` | `8000` | Grace period before escalating to a hard kill |
 | `label` | the name | Used in log prefixes |

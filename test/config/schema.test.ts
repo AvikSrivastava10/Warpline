@@ -406,8 +406,50 @@ describe('normalizeConfig', () => {
       );
     });
 
+    it('accepts https', () => {
+      expect(processFrom({ command: 'x', open: 'https://example.test/admin' }).open).toBe(
+        'https://example.test/admin',
+      );
+    });
+
     it('treats false as not opening anything', () => {
       expect(processFrom({ command: 'x', open: false }).open).toBeUndefined();
+    });
+
+    // `open` reaches the platform's URL handler, and a warpline.yml arrives with
+    // any cloned repository, so the accepted set is narrowed to http(s).
+    it('rejects a file: URL', () => {
+      expect(problemsOf({ processes: { web: { command: 'x', open: 'file:///etc/passwd' } } }).join('\n')).toContain(
+        'must be an http(s) URL',
+      );
+    });
+
+    it('rejects a javascript: URL', () => {
+      expect(problemsOf({ processes: { web: { command: 'x', open: 'javascript:alert(1)' } } }).join('\n')).toContain(
+        'must be an http(s) URL',
+      );
+    });
+
+    it('rejects a custom protocol handler', () => {
+      expect(problemsOf({ processes: { web: { command: 'x', open: 'ms-msdt:/id' } } }).join('\n')).toContain(
+        'must be an http(s) URL',
+      );
+    });
+
+    it('rejects a string that is not a URL at all', () => {
+      expect(problemsOf({ processes: { web: { command: 'x', open: 'open the app' } } }).join('\n')).toContain(
+        'must be an http(s) URL',
+      );
+    });
+
+    it('still accepts an http URL containing shell metacharacters, which openUrl neutralises', () => {
+      // `&` is legal in a query string, so the schema cannot reject it without
+      // rejecting ordinary URLs. Keeping it away from a shell is openUrl's job;
+      // this test records where the boundary sits so neither layer is mistaken
+      // for the whole defence.
+      expect(processFrom({ command: 'x', open: 'http://localhost:3000/?a=1&b=2' }).open).toBe(
+        'http://localhost:3000/?a=1&b=2',
+      );
     });
   });
 

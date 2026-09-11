@@ -195,17 +195,42 @@ export function runToCompletion(
   });
 }
 
-/** Opens a URL in the platform's default browser, best effort. */
+/**
+ * Opens a URL in the platform's default browser, best effort.
+ *
+ * Only http(s) is ever opened. The config validator enforces that too, but this
+ * is the function that hands a string to the operating system, so it does not
+ * trust its caller to have done so.
+ */
 export async function openUrl(url: string): Promise<void> {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return;
+
+  const target = parsed.toString();
+
   if (isWindows) {
-    // `start` is a cmd builtin; the empty title argument guards against URLs
-    // containing characters cmd would otherwise read as a window title.
-    await execQuiet('cmd', ['/d', '/s', '/c', 'start', '', url]);
+    // Deliberately not `cmd /c start`. cmd reads `&`, `|`, and `^` as command
+    // separators, and Node only wraps an argument in quotes when it contains
+    // whitespace -- so `http://localhost:3000&calc` reaches cmd unquoted and
+    // runs `calc`. Since `open:` comes from a repo-committed warpline.yml, that
+    // turned cloning a repository into arbitrary command execution.
+    //
+    // `rundll32` is executed directly with no shell involved, so the URL stays a
+    // single argument whatever it contains. Scheme validation above cannot
+    // substitute for this: `&` is legal in a host and in a query string, so a
+    // hostile value can be a perfectly valid http URL.
+    await execQuiet('rundll32', ['url.dll,FileProtocolHandler', target]);
     return;
   }
   if (process.platform === 'darwin') {
-    await execQuiet('open', [url]);
+    await execQuiet('open', [target]);
     return;
   }
-  await execQuiet('xdg-open', [url]);
+  // execFile, so no shell parses this either.
+  await execQuiet('xdg-open', [target]);
 }

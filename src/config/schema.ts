@@ -93,6 +93,25 @@ function asPort(value: unknown, where: string, problems: Problems): number | und
   return num;
 }
 
+/**
+ * True for an absolute http(s) URL.
+ *
+ * Note what this cannot do: `&` is legal in both a host and a query string, so a
+ * value crafted to break out of a shell can still be a valid http URL. Keeping
+ * the URL away from a shell is `proc/spawn.ts::openUrl`'s job. This check exists
+ * to rule out the other schemes -- `file:`, `javascript:`, and custom protocol
+ * handlers -- and plain non-URL junk.
+ */
+function isHttpUrl(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  return url.protocol === 'http:' || url.protocol === 'https:';
+}
+
 function asBool(value: unknown, where: string, problems: Problems, fallback: boolean): boolean {
   if (value === undefined || value === null) return fallback;
   if (typeof value === 'boolean') return value;
@@ -427,7 +446,16 @@ function parseProcess(
         open = `http://localhost:${port}`;
       }
     } else if (typeof object.open === 'string' && object.open.trim().length > 0) {
-      open = object.open.trim();
+      // Restricted to http(s) deliberately. This value is handed to the
+      // platform's URL handler, and a warpline.yml travels with any repository
+      // a user clones, so an unrestricted string would let a custom protocol
+      // handler or a `file:` read ride along.
+      const candidate = object.open.trim();
+      if (isHttpUrl(candidate)) {
+        open = candidate;
+      } else {
+        problems.add(`${where}.open must be an http(s) URL (got "${candidate}")`);
+      }
     } else {
       problems.add(`${where}.open must be true or a URL string`);
     }
