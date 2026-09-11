@@ -51,16 +51,16 @@
     "yaml": "2.9.0"
   },
   "devDependencies": {
-    "@types/node": "22.15.3",
+    "@types/node": "22.20.2",
     "typescript": "5.8.3",
-    "vitest": "3.2.7"
+    "vitest": "5.0.0"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/warpline-dev/warpline.git"
+    "url": "git+https://github.com/AvikSrivastava10/Warpline.git"
   },
   "bugs": {
-    "url": "https://github.com/warpline-dev/warpline/issues"
+    "url": "https://github.com/AvikSrivastava10/Warpline/issues"
   },
-  "homepage": "https://github.com/warpline-dev/warpline#readme"
+  "homepage": "https://github.com/AvikSrivastava10/Warpline#readme"
 }

@@ -27,10 +27,14 @@ export default defineConfig({
      * These are pure-function tests measured in milliseconds, so parallelism
      * buys nothing here anyway: process startup dominates the run either way.
      * Revisit when the integration tier lands and wall time actually matters.
+     *
+     * Vitest 4 removed `poolOptions`, so the old `poolOptions.forks.singleFork`
+     * is expressed as top-level `maxWorkers`. Worth knowing that the removed
+     * form fails silently: it warns, ignores the setting, and reverts to a
+     * worker per core.
      */
     pool: 'forks',
-    poolOptions: {
-      forks: { singleFork: true },
-    },
+    maxWorkers: 1,
+    fileParallelism: false,
   },
 });
