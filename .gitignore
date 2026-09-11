@@ -1,0 +1,23 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# internal working documentation, not shipped
+docs/
+
+# local scratch
+.tmp/
+tmp/
+*.log
+
+# exported agent chat sessions
+kiro-session-*.zip
+
+# env
+.env
+.env.*
+!.env.example
+
+# editors / os
+.DS_Store
+Thumbs.db

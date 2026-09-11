@@ -1,0 +1,11 @@
+{
+  "// note": "Typechecks the tests without letting them into the build. tsconfig.json keeps rootDir at src so dist stays clean.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "declaration": false,
+    "declarationMap": false
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts", "vitest.config.ts"]
+}

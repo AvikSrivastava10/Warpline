@@ -1,0 +1,66 @@
+{
+  "name": "warpline",
+  "version": "0.1.0",
+  "description": "Save and restore your whole project working context - directory, multi-process dev servers, and env - under one memorable name. Terminal-native, tmux-free, cross-platform.",
+  "keywords": [
+    "cli",
+    "dev-server",
+    "process-manager",
+    "workspace",
+    "project-switcher",
+    "monorepo",
+    "dotenv",
+    "developer-tools",
+    "procfile",
+    "orchestration"
+  ],
+  "license": "MIT",
+  "author": "Warpline contributors",
+  "type": "module",
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "bin": {
+    "warpline": "dist/bin.js"
+  },
+  "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "rebuild": "npm run clean && npm run build",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "tsc -p tsconfig.json --watch",
+    "warpline": "node dist/bin.js",
+    "prepublishOnly": "npm run rebuild"
+  },
+  "dependencies": {
+    "picocolors": "1.1.1",
+    "yaml": "2.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.3",
+    "typescript": "5.8.3",
+    "vitest": "3.2.7"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/warpline-dev/warpline.git"
+  },
+  "bugs": {
+    "url": "https://github.com/warpline-dev/warpline/issues"
+  },
+  "homepage": "https://github.com/warpline-dev/warpline#readme"
+}
