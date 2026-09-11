@@ -74,7 +74,10 @@ export class ProcessLogger {
       id,
       label,
       colorize: colorForIndex(index),
-      stream: fs.createWriteStream(file, { flags: 'a' }),
+      // 0o600 to match the state and registry files. Captured output routinely
+      // contains whatever a dev server prints, which includes connection strings
+      // and tokens, so world-readable was the wrong default for these.
+      stream: fs.createWriteStream(file, { flags: 'a', mode: 0o600 }),
       file,
       bytesWritten,
       partial: '',
@@ -185,7 +188,7 @@ export class ProcessLogger {
       /* if rotation fails, keep appending to the current file */
     }
 
-    channel.stream = fs.createWriteStream(channel.file, { flags: 'a' });
+    channel.stream = fs.createWriteStream(channel.file, { flags: 'a', mode: 0o600 });
     channel.bytesWritten = 0;
   }
 

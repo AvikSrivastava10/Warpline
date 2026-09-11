@@ -175,23 +175,4 @@ export function listRuntimeNames(): string[] {
   }
 }
 
-export function statusLabel(status: ProcessStatus): string {
-  switch (status) {
-    case 'ready':
-      return 'ready';
-    case 'running':
-      return 'running';
-    case 'starting':
-      return 'starting';
-    case 'done':
-      return 'done';
-    case 'failed':
-      return 'failed';
-    case 'stopped':
-      return 'stopped';
-    case 'skipped':
-      return 'skipped';
-    default:
-      return 'pending';
-  }
-}
+

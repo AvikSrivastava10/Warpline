@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import { flagBool, flagList, flagNumber, parseArgs, renderFlagHelp, type FlagSpecs } from '../core/args.js';
 import { colorForIndex, out, padEndVisible, theme } from '../core/ui.js';
 import { paths, tildify } from '../core/paths.js';
@@ -66,7 +67,7 @@ function discoverSources(name: string, only: string[]): LogSource[] {
     for (const entry of entries) {
       const id = entry.slice(0, -'.log'.length);
       if (wanted.size > 0 && !wanted.has(id)) continue;
-      sources.push({ id, label: id, file: `${dir}/${entry}` });
+      sources.push({ id, label: id, file: path.join(dir, entry) });
     }
   }
 

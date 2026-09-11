@@ -1,0 +1,20 @@
+# Normalise line endings in the repository to LF, and check out platform-native.
+#
+# This matters more than usual here: the project is developed on Windows and
+# targets POSIX too, so without this the committed bytes depend on each
+# contributor's core.autocrlf setting.
+* text=auto eol=lf
+
+# Lockfiles and generated data: keep them LF everywhere so diffs stay reviewable.
+package-lock.json text eol=lf
+
+# Explicitly binary, so git never tries to normalise them.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.zip binary
+*.woff binary
+*.woff2 binary

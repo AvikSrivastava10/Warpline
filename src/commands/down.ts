@@ -2,13 +2,7 @@ import { flagBool, flagList, parseArgs, renderFlagHelp, type FlagSpecs } from '.
 import { glyph, out, theme } from '../core/ui.js';
 import { terminateTree } from '../proc/spawn.js';
 import { shutdownOrder } from '../proc/graph.js';
-import {
-  clearRuntime,
-  inspectRuntime,
-  isPidAlive,
-  writeRuntime,
-  type ProcessRuntime,
-} from '../state/runtime.js';
+import { clearRuntime, inspectRuntime, isPidAlive, writeRuntime } from '../state/runtime.js';
 import { resolveProjectLoosely } from './context.js';
 
 export const downFlags: FlagSpecs = {
@@ -217,10 +211,4 @@ export async function runRestart(argv: string[]): Promise<number> {
   return runUp(forwarded);
 }
 
-/** Exposed for `up --restart`. */
-export async function stopRecorded(name: string, live: ProcessRuntime[]): Promise<void> {
-  for (const proc of [...live].reverse()) {
-    await terminateTree(proc.pid, { graceMs: 8000 });
-  }
-  clearRuntime(name);
-}
+

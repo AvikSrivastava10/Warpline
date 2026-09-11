@@ -1,7 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
-import YAML from 'yaml';
-import { flagBool, flagString, parseArgs, renderFlagHelp, type FlagSpecs } from '../core/args.js';
+import { flagBool, parseArgs, renderFlagHelp, type FlagSpecs } from '../core/args.js';
 import { WarplineError } from '../core/errors.js';
 import { glyph, out, theme } from '../core/ui.js';
 import { paths, tildify } from '../core/paths.js';
@@ -292,12 +291,4 @@ export async function runPrune(argv: string[]): Promise<number> {
   return 0;
 }
 
-/** Used by `doctor` to report on the YAML document without a full parse. */
-export function readConfigDocument(file: string): YAML.Document.Parsed | undefined {
-  try {
-    const text = fs.readFileSync(file, 'utf8');
-    return YAML.parseDocument(text);
-  } catch {
-    return undefined;
-  }
-}
+

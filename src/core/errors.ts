@@ -29,11 +29,4 @@ export class ConfigError extends WarplineError {
   }
 }
 
-export function isWarplineError(error: unknown): error is WarplineError {
-  return error instanceof WarplineError;
-}
 
-export function errorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return String(error);
-}

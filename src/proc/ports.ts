@@ -1,6 +1,5 @@
 import net from 'node:net';
 import { execFile } from 'node:child_process';
-import { sleep } from '../core/fsx.js';
 
 const DEFAULT_HOST = '127.0.0.1';
 
@@ -33,26 +32,6 @@ export function isPortListening(port: number, host = DEFAULT_HOST, timeoutMs = 4
       finish(false);
     }
   });
-}
-
-export interface PortWaitOptions {
-  host?: string;
-  timeoutMs: number;
-  intervalMs: number;
-  /** Aborts the wait early, e.g. because the process died. */
-  signal?: AbortSignal;
-}
-
-export async function waitForPort(port: number, options: PortWaitOptions): Promise<boolean> {
-  const host = options.host ?? DEFAULT_HOST;
-  const deadline = Date.now() + options.timeoutMs;
-
-  for (;;) {
-    if (options.signal?.aborted) return false;
-    if (await isPortListening(port, host)) return true;
-    if (Date.now() >= deadline) return false;
-    await sleep(options.intervalMs);
-  }
 }
 
 function run(command: string, args: string[], timeoutMs = 2500): Promise<string | undefined> {
@@ -202,10 +181,4 @@ export async function checkPortConflicts(
   return results.filter((entry): entry is PortConflict => entry !== undefined);
 }
 
-/** Finds an unused port at or above `start`, for `--auto-port`. */
-export async function findFreePort(start: number, attempts = 50): Promise<number | undefined> {
-  for (let port = start; port < start + attempts && port <= 65535; port += 1) {
-    if (!(await isPortListening(port))) return port;
-  }
-  return undefined;
-}
+

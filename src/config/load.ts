@@ -1,5 +1,4 @@
 import path from 'node:path';
-import fs from 'node:fs';
 import YAML from 'yaml';
 import { ConfigError, WarplineError } from '../core/errors.js';
 import { fileExists, readTextOrNull, writeFileAtomic } from '../core/fsx.js';
@@ -114,14 +113,4 @@ export function configExistsIn(dir: string): string | undefined {
   return undefined;
 }
 
-/** True when `dir` looks like a project root worth registering. */
-export function looksLikeProjectRoot(dir: string): boolean {
-  const markers = ['.git', 'package.json', 'go.mod', 'Cargo.toml', 'pyproject.toml', 'composer.json'];
-  return markers.some((marker) => {
-    try {
-      return fs.existsSync(path.join(dir, marker));
-    } catch {
-      return false;
-    }
-  });
-}
+
