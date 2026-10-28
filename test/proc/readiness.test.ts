@@ -35,3 +35,34 @@ describe('readiness cancellation and output', () => {
       .resolves.toMatchObject({ ready: true });
   });
 });
+
+ describe('polling budgets', () => {
+  it('cancels an in-flight HTTP request and releases its signal', async () => {
+    const controller = new AbortController();
+    let requestSignal: AbortSignal | undefined;
+    vi.stubGlobal('fetch', vi.fn((_url: unknown, options: RequestInit) => {
+      requestSignal = options.signal as AbortSignal;
+      return new Promise((_resolve, reject) => requestSignal?.addEventListener('abort', () => reject(new Error('aborted'))));
+    }));
+    try {
+      const result = createReadinessWaiter({ ...probe('http'), url: 'http://localhost:12345' })
+        .wait({ exited: pending, aborted: controller.signal });
+      controller.abort();
+      await expect(result).resolves.toMatchObject({ ready: false, reason: 'startup aborted' });
+      expect(requestSignal?.aborted).toBe(true);
+    } finally { vi.unstubAllGlobals(); }
+  });
+  it('enforces the total budget even when the polling interval is much larger', async () => {
+    vi.useFakeTimers();
+    const result = createReadinessWaiter({ ...probe('file'), file: '/warpline-nonexistent-fixture', timeoutMs: 100, intervalMs: 90000 })
+      .wait({ exited: pending, aborted: new AbortController().signal });
+    await vi.advanceTimersByTimeAsync(100);
+    await expect(result).resolves.toMatchObject({ ready: false, elapsedMs: 100 });
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it('stops polling as soon as the child exits', async () => {
+    const result = createReadinessWaiter({ ...probe('file'), file: '/warpline-nonexistent-fixture' })
+      .wait({ exited: Promise.resolve({ code: 2, signal: null }), aborted: new AbortController().signal });
+    await expect(result).resolves.toMatchObject({ ready: false, reason: expect.stringContaining('exited with code 2') });
+  });
+});

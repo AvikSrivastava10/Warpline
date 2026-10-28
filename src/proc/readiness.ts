@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import { sleep } from '../core/fsx.js';
 import { isPortListening } from './ports.js';
 import type { ReadyProbe } from '../config/types.js';
 
@@ -203,52 +202,52 @@ export function createReadinessWaiter(probe: ReadyProbe): ReadinessWaiter {
       }
 
       // Polling probes: port, http, file.
-      const deadline = startedAt + probe.timeoutMs;
-      let exitedResult: { code: number | null; signal: string | null } | undefined;
-      void exited.then((result) => {
-        exitedResult = result;
-      });
-
-      for (;;) {
-        if (aborted.aborted) {
+      const controller = new AbortController();
+      const cancel = () => controller.abort();
+      aborted.addEventListener('abort', cancel, { once: true });
+      const timeout = createTimeout(probe.timeoutMs, { kind: 'timeout' as const });
+      const polling = async (): Promise<{ kind: 'ready' | 'aborted' }> => {
+        for (;;) {
+          if (controller.signal.aborted) return { kind: 'aborted' };
+          if (await pollOnce(probe, controller.signal)) return { kind: 'ready' };
+          if (controller.signal.aborted) return { kind: 'aborted' };
+          const pause = createTimeout(probe.intervalMs, undefined);
+          try {
+            await raceWithAbort([pause.promise], controller.signal);
+          } finally {
+            pause.cancel();
+          }
+        }
+      };
+      try {
+        const outcome = await raceWithAbort([exitRace, timeout.promise, polling()], aborted);
+        if (outcome.kind === 'aborted') {
           return { ready: false, reason: 'startup aborted', elapsedMs: elapsed() };
         }
-
-        if (await pollOnce(probe)) {
+        if (outcome.kind === 'ready') {
           return { ready: true, reason: `${describe()} responded`, elapsedMs: elapsed() };
         }
-
-        // Check for death after polling, so a process that became ready and
-        // then exited in the same tick is still credited as ready.
-        if (exitedResult) {
-          const { code, signal } = exitedResult;
-          return {
-            ready: false,
-            reason: signal
-              ? `exited (${signal}) before ${describe()} responded`
-              : `exited with code ${code ?? 'unknown'} before ${describe()} responded`,
-            elapsedMs: elapsed(),
-          };
+        if (outcome.kind === 'exit') {
+          const { code, signal } = outcome.result;
+          return { ready: false, reason: signal
+            ? `exited (${signal}) before ${describe()} responded`
+            : `exited with code ${code ?? 'unknown'} before ${describe()} responded`, elapsedMs: elapsed() };
         }
-
-        if (Date.now() >= deadline) {
-          return {
-            ready: false,
-            reason: `${describe()} did not respond within ${probe.timeoutMs}ms`,
-            elapsedMs: elapsed(),
-          };
-        }
-
-        await sleep(probe.intervalMs);
+        return { ready: false, reason: `${describe()} did not respond within ${probe.timeoutMs}ms`, elapsedMs: elapsed() };
+      } finally {
+        timeout.cancel();
+        controller.abort();
+        aborted.removeEventListener('abort', cancel);
       }
+
     },
   };
 }
 
-async function pollOnce(probe: ReadyProbe): Promise<boolean> {
+async function pollOnce(probe: ReadyProbe, signal: AbortSignal): Promise<boolean> {
   switch (probe.kind) {
     case 'port':
-      return probe.port === undefined ? true : isPortListening(probe.port, probe.host ?? '127.0.0.1');
+      return probe.port === undefined ? true : isPortListening(probe.port, probe.host ?? '127.0.0.1', 400, signal);
     case 'file':
       if (!probe.file) return true;
       try {
@@ -257,16 +256,19 @@ async function pollOnce(probe: ReadyProbe): Promise<boolean> {
         return false;
       }
     case 'http':
-      return probeHttp(probe);
+      return probeHttp(probe, signal);
     default:
       return true;
   }
 }
 
-async function probeHttp(probe: ReadyProbe): Promise<boolean> {
+async function probeHttp(probe: ReadyProbe, signal: AbortSignal): Promise<boolean> {
   if (!probe.url) return true;
   const maxStatus = probe.maxStatus ?? 499;
   const controller = new AbortController();
+  const cancel = () => controller.abort();
+  signal.addEventListener('abort', cancel, { once: true });
+  if (signal.aborted) cancel();
   const timer = setTimeout(() => controller.abort(), Math.min(probe.intervalMs * 8, 5000));
 
   try {
@@ -292,6 +294,7 @@ async function probeHttp(probe: ReadyProbe): Promise<boolean> {
     return false;
   } finally {
     clearTimeout(timer);
+    signal.removeEventListener('abort', cancel);
   }
 }
 

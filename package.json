@@ -44,7 +44,8 @@
     "test:watch": "vitest",
     "dev": "tsc -p tsconfig.json --watch",
     "warpline": "node dist/bin.js",
-    "prepublishOnly": "npm run rebuild"
+    "prepublishOnly": "npm run rebuild",
+    "pretest": "npm run build"
   },
   "dependencies": {
     "picocolors": "1.1.1",

@@ -9,7 +9,7 @@ const DEFAULT_HOST = '127.0.0.1';
  * (0.0.0.0 vs 127.0.0.1 vs ::1), whereas a successful connect is unambiguous
  * evidence that the port is taken.
  */
-export function isPortListening(port: number, host = DEFAULT_HOST, timeoutMs = 400): Promise<boolean> {
+export function isPortListening(port: number, host = DEFAULT_HOST, timeoutMs = 400, signal?: AbortSignal): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = new net.Socket();
     let settled = false;
@@ -17,10 +17,14 @@ export function isPortListening(port: number, host = DEFAULT_HOST, timeoutMs = 4
     const finish = (result: boolean): void => {
       if (settled) return;
       settled = true;
+      signal?.removeEventListener('abort', onAbort);
       socket.destroy();
       resolve(result);
     };
 
+    const onAbort = () => finish(false);
+    signal?.addEventListener('abort', onAbort, { once: true });
+    if (signal?.aborted) { finish(false); return; }
     socket.setTimeout(timeoutMs);
     socket.once('connect', () => finish(true));
     socket.once('timeout', () => finish(false));
