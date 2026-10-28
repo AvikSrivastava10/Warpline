@@ -276,7 +276,7 @@ describe('restart policy', () => {
 });
 
 describe('hooks', () => {
-  it('runs a before hook ahead of any process', async () => {
+  it('starts successfully with a successful before hook', async () => {
     const config = fixtureConfig(
       root,
       [
@@ -381,7 +381,7 @@ describe('what the child process actually receives', () => {
 });
 
 describe('shutdown', () => {
-  it('stops dependents before what they depend on', async () => {
+  it('stops every process in a dependency chain and clears its PID', async () => {
     const config = fixtureConfig(
       root,
       [
