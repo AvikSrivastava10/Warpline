@@ -239,7 +239,7 @@ warpline up --env DEBUG=1          # extra environment values
 warpline up --no-prefix -T         # raw lines, with timestamps
 
 warpline status --all --json       # machine-readable, every project
-warpline logs api -n 200           # last 200 lines of one process
+warpline logs --only api -n 200           # last 200 lines of one process
 warpline down --all                # stop every running project
 warpline down --orphans            # recover supervisors warpline lost track of
 warpline list --names              # bare names, for scripts and fzf

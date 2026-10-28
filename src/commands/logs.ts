@@ -29,7 +29,7 @@ export function logsHelp(): string {
     '',
     theme.dim('Examples:'),
     `  ${theme.code('warpline logs -f')}               follow everything`,
-    `  ${theme.code('warpline logs api -n 200')}       last 200 lines of the api process`,
+    `  ${theme.code('warpline logs --only api -n 200')}       last 200 lines of the api process`,
   ].join('\n');
 }
 

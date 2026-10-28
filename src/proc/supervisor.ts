@@ -371,6 +371,14 @@ export class Supervisor {
 
     const outcome = await waiter.wait({ exited: exit.promise, aborted: this.abort.signal });
 
+    // Shutdown owns termination and final statuses. A cancelled readiness wait
+    // must not race it with a second kill or overwrite stopped with failed.
+    if (this.shuttingDown || managed.stopping) {
+      managed.ready.resolve(false);
+      startup.resolve({ id: config.id, ok: false, reason: 'startup aborted' });
+      return 'done';
+    }
+
     if (outcome.ready) {
       managed.runtime.readyAt = Date.now();
       const terminal = config.kind === 'task' ? 'done' : 'ready';

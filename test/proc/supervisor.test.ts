@@ -1,3 +1,5 @@
+import { Supervisor } from '../../src/proc/supervisor.js';
+import { ProcessLogger } from '../../src/proc/logger.js';
 import fs from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { paths } from '../../src/core/paths.js';
@@ -476,3 +478,26 @@ describe('state on disk', () => {
     });
   }, 30_000);
 });
+
+ it('shutdown cancels readiness without overwriting final stopped state', async () => {
+  const config = fixtureConfig(root, [
+    'name: cancelstartup', 'processes:', '  web:',
+    '    command: ' + stay,
+    '    ready: { log: "never-matches-this-output", timeout: 90000 }',
+  ].join('\n'));
+  const logger = new ProcessLogger({ projectName: config.name, toConsole: false, prefix: false });
+  const supervisor = new Supervisor({ config, projectName: config.name, processes: config.processes,
+    mode: 'foreground', logger, quiet: true });
+  const starting = supervisor.start();
+  try {
+    await waitForState(config.name, (state) => state.processes.web?.pid !== undefined);
+    await supervisor.stopAll('cancel startup');
+    await starting;
+    expect(supervisor.runtime.processes.web?.status).toBe('stopped');
+    expect(readRuntime(config.name)?.processes.web?.status).toBe('stopped');
+  } finally {
+    await supervisor.stopAll('test teardown');
+    await starting;
+    await logger.close();
+  }
+}, 30000);

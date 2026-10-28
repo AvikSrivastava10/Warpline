@@ -1,7 +1,7 @@
 /**
- * The resolved, fully-defaulted shape of a `warpline.yml`. Everything in here is
- * safe to commit to a repo: env *values* are never stored, only references to
- * env files plus an allowlist of names to inherit from the shell.
+ * The resolved, fully-defaulted shape of a `warpline.yml`. Environment file contents are not copied here. Literal env.vars and process
+ * env values are included, so use file references for secrets and only commit
+ * non-secret literal values.
  */
 export interface WarplineConfig {
   /** Default name used when registering the project in the global index. */

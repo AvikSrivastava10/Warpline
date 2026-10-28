@@ -102,16 +102,21 @@ export function createReadinessWaiter(probe: ReadyProbe): ReadinessWaiter {
       if (!pattern || matched) return;
       // Keep a small trailing window so a pattern split across two chunks
       // still matches, without retaining the entire output history.
-      buffer = (buffer + text).slice(-8192);
+      buffer += text;
       if (pattern.test(buffer)) {
         matched = true;
         logHit.resolve();
       }
+      buffer = buffer.slice(-8192);
     },
 
     async wait({ exited, aborted }): Promise<ReadyOutcome> {
       const startedAt = Date.now();
       const elapsed = (): number => Date.now() - startedAt;
+
+      if (aborted.aborted) {
+        return { ready: false, reason: 'startup aborted', elapsedMs: elapsed() };
+      }
 
       if (probe.kind === 'none') {
         return { ready: true, reason: 'no readiness check declared', elapsedMs: 0 };
@@ -123,7 +128,10 @@ export function createReadinessWaiter(probe: ReadyProbe): ReadinessWaiter {
       if (probe.kind === 'exit') {
         const timeout = createTimeout(probe.timeoutMs, { kind: 'timeout' as const });
         try {
-          const outcome = await Promise.race([exitRace, timeout.promise]);
+          const outcome = await raceWithAbort([exitRace, timeout.promise], aborted);
+          if (outcome.kind === 'aborted') {
+            return { ready: false, reason: 'startup aborted', elapsedMs: elapsed() };
+          }
           if (outcome.kind === 'timeout') {
             return { ready: false, reason: `did not finish within ${probe.timeoutMs}ms`, elapsedMs: elapsed() };
           }
@@ -143,7 +151,10 @@ export function createReadinessWaiter(probe: ReadyProbe): ReadinessWaiter {
         const settleMs = probe.settleMs ?? 400;
         const settle = createTimeout(settleMs, { kind: 'settled' as const });
         try {
-          const outcome = await Promise.race([exitRace, settle.promise]);
+          const outcome = await raceWithAbort([exitRace, settle.promise], aborted);
+          if (outcome.kind === 'aborted') {
+            return { ready: false, reason: 'startup aborted', elapsedMs: elapsed() };
+          }
           if (outcome.kind === 'exit') {
             const { code, signal } = outcome.result;
             return {
@@ -164,7 +175,10 @@ export function createReadinessWaiter(probe: ReadyProbe): ReadinessWaiter {
         const timeout = createTimeout(probe.timeoutMs, { kind: 'timeout' as const });
         try {
           const hit = logHit.promise.then(() => ({ kind: 'hit' as const }));
-          const outcome = await Promise.race([exitRace, hit, timeout.promise]);
+          const outcome = await raceWithAbort([exitRace, hit, timeout.promise], aborted);
+          if (outcome.kind === 'aborted') {
+            return { ready: false, reason: 'startup aborted', elapsedMs: elapsed() };
+          }
           if (outcome.kind === 'hit') {
             return { ready: true, reason: `matched /${probe.logPattern}/i`, elapsedMs: elapsed() };
           }
@@ -278,5 +292,20 @@ async function probeHttp(probe: ReadyProbe): Promise<boolean> {
     return false;
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/** Remove the listener even when exit or readiness wins the race. */
+async function raceWithAbort<T extends readonly unknown[]>(promises: T, signal: AbortSignal): Promise<Awaited<T[number]> | { kind: 'aborted' }> {
+  let onAbort!: () => void;
+  const cancellation = new Promise<{ kind: 'aborted' }>((resolve) => {
+    onAbort = () => resolve({ kind: 'aborted' });
+    signal.addEventListener('abort', onAbort, { once: true });
+    if (signal.aborted) onAbort();
+  });
+  try {
+    return await Promise.race([...promises, cancellation]);
+  } finally {
+    signal.removeEventListener('abort', onAbort);
   }
 }
